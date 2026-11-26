@@ -1,7 +1,7 @@
 {
   "domain": "cover_rf_time_based",
   "name": "Cover Time Based (script/entity)",
-  "version": "1.1.5",
+  "version": "1.2.5",
   "documentation": "https://github.com/gyoori/home-assistant-custom-components-cover-rf-time-based",
   "iot_class": "assumed_state",
   "codeowners": ["@davidramosweb", "@nagyrobi", "@Alfiegerner"]
