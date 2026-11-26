@@ -5,6 +5,13 @@ Since I moved the time-based functionality to an [ESPHome](https://esphome.io/co
 
 Anyone feel free to fork it and continue development as needed.
 
+**Changes in this fork (gyoori)**
+
+This fork adds support for gates and garage doors that have only ONE button (one remote impulse does everything):
+- New device option `button_script_entity_id`: one script is used for open, close and stop. See [Single-button covers](#single-button-covers-gates-and-garage-doors).
+- New optional device option `auto_close_seconds`: for controllers that close the gate by themselves after a pause.
+- The single-button logic works ONLY for devices that use `button_script_entity_id`. Covers with separate open, close and stop scripts (for example shutters) always move in the direction you ask, as in the original component.
+
 
 # Cover Time Based script/entity
 
@@ -71,6 +78,23 @@ cover:
         device_class: curtain #optional
         availability_template: "{{ not (is_state('cover.myroom', 'unavailable') or is_state('cover.myroom', 'unknown')) }}" #optional
 ```
+**OR** (gate or garage door with one button, one script for everything):
+
+```yaml
+cover:
+  - platform: cover_rf_time_based
+    devices:
+      my_gate:
+        name: My Gate
+        travelling_time_up: 23
+        travelling_time_down: 23
+        button_script_entity_id: script.my_gate_button
+        auto_close_seconds: 30 #optional
+        device_class: garage #optional
+        availability_template: "{{ is_state('binary_sensor.gate_status', 'on') }}" #optional
+```
+With `button_script_entity_id` you do not set `open_script_entity_id`, `close_script_entity_id` and `stop_script_entity_id`.
+
 All mandatory settings self-explanatory. 
 
 Optional settings:
@@ -78,6 +102,8 @@ Optional settings:
 - `always_confident` defaults to `False`. If set to `True`, the calculated state will always be assumed to be accurate. This mainly affects UI components - for example, if the cover is fully opened, the open button will be disabled. Make sure to [set](#cover_rf_time_basedset_known_position) the current state after first setup and only use this entity to control the covers. Not recommended to be `True` for RF-based covers.
 - `device_class` defaults to `shutter` if not specified. See the docs for availale [cover device classes](http://dev-docs.home-assistant.io/en/master/api/components.html#homeassistant.components.cover.CoverDeviceClass).
 - `availability_template` if not specified will make the cover always available. You can use a template returning `True` or `False` in order to toggle availability of the cover based on other entities. Useful to link with the connection status of your RF Bridge or relays device.
+- `button_script_entity_id` (instead of the three script options) is the script that sends the one button impulse of a single-button gate or garage door. It is used for open, close and stop. See [Single-button covers](#single-button-covers-gates-and-garage-doors).
+- `auto_close_seconds` is a number of seconds, no default (off). Use it when the gate controller closes the gate by itself after a pause. If the gate was stopped in the middle of the travel, the cover starts to calculate the closing after this time, without sending any impulse. The timer is cancelled by a new movement command (single-button covers) and by a `set_known_action` or `set_known_position` call.
 
 ### Example scripts.yaml entry
 #### RF covers
@@ -200,6 +226,16 @@ The example below assumes you've set `send_stop_at_ends: True` in the cover conf
 ```
 Note how you don't have to configure these as switches in Home Assistant at all, it's enough just to publish MQTT commands strainght from the script (credits to [VDRainer](https://github.com/VDRainer) for this example).
 Of course you can customize based on what ever other way to trigger these 3 type of movements. You could, for example, turn on and off warning lights along with the movement.
+
+### Single-button covers (gates and garage doors)
+Many gates and garage doors have one remote button. Every press does the next step: open, stop, close, stop, and so on. Use `button_script_entity_id` for these. The same script is used for open, close and stop, and the cover works like this:
+- If the cover is moving, any open or close command sends the impulse and STOPS the cover. It does not matter if you pressed open or close.
+- If the cover is stopped in the middle (not fully open or closed), the next command starts the movement in the opposite direction of the last movement.
+- If there is no known last direction, or the cover is at an end position (0 or 100), it moves in the direction you asked.
+- Setting a known position of 0 or 100 (with `set_known_position`) clears the remembered last direction.
+- With `auto_close_seconds` set, the cover starts to count down as closing after a stop in the middle, because the controller closes the gate by itself.
+
+This logic is used only for devices with `button_script_entity_id`. Devices with separate scripts (shutters) always move in the requested direction.
 
 ### Services to set position or action without triggering cover movement
 
